@@ -229,9 +229,12 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 
-// A Clock tracks how much time has elapsed since it started, so animations
-// run at the same speed regardless of the computer's frame rate.
-const clock = new THREE.Clock();
+// A Timer tracks elapsed time so animations run at the same speed
+// regardless of the computer's frame rate. It replaces the deprecated
+// THREE.Clock and also handles tab-visibility via the Page Visibility API
+// to avoid large time jumps when the tab is hidden.
+const timer = new THREE.Timer();
+timer.connect(document);
 
 // --- Live Color Update (no geometry rebuild) ---
 // When only a color changes, we just recompute the color attribute on
@@ -300,12 +303,16 @@ colorFolder.open();
 
 // The Animation Loop runs over and over (about 60 times per second) using
 // requestAnimationFrame. This is what makes the scene update and display.
-function animate() {
+function animate(timestamp) {
   requestAnimationFrame(animate);
 
+  // Update the timer's internal state before reading elapsed time.
+  // Passing the requestAnimationFrame timestamp gives the most accurate timing.
+  timer.update(timestamp);
+
   // One full rotation every ~60 seconds (2π / 60 radians per second).
-  // Using clock.getElapsedTime() keeps the speed consistent across computers.
-  const elapsed = clock.getElapsedTime();
+  // Using timer.getElapsed() keeps the speed consistent across computers.
+  const elapsed = timer.getElapsed();
   const rotationSpeed = (Math.PI * 2) / 60;
   particleCloud.rotation.z = elapsed * rotationSpeed;
   glowCloud.rotation.z = elapsed * rotationSpeed;
