@@ -136,6 +136,41 @@ const material = new THREE.PointsMaterial({
   vertexColors: true, // tells Three.js to use the per-particle colors
 });
 
+// --- Glow Layer ---
+// A second Points object placed behind the main stars creates a soft glow
+// around each particle. We reuse the same geometry (same positions and
+// colors) but with a smaller, more transparent material with a circular
+// texture so the glow looks like a soft halo instead of square blocks.
+
+// Create a soft circular texture using a hidden canvas. The radial
+// gradient makes each point fade from bright in the center to
+// transparent at the edges, giving a natural star-glow look.
+const canvas = document.createElement("canvas");
+canvas.width = 32;
+canvas.height = 32;
+const ctx = canvas.getContext("2d");
+const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+gradient.addColorStop(0, "rgba(255, 255, 255, 0.8)");
+gradient.addColorStop(0.5, "rgba(255, 255, 255, 0.2)");
+gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+ctx.fillStyle = gradient;
+ctx.fillRect(0, 0, 32, 32);
+const glowTexture = new THREE.CanvasTexture(canvas);
+
+const glowMaterial = new THREE.PointsMaterial({
+  size: 0.04, // only slightly larger than main stars (0.02) for a subtle halo
+  map: glowTexture, // circular soft texture instead of default square
+  transparent: true, // enables opacity-based transparency
+  opacity: 0.15, // very low opacity keeps the glow subtle and soft
+  vertexColors: true, // reuse the per-particle colors from the geometry
+  depthWrite: false, // prevents the glow from blocking the main stars in front
+});
+
+// Both layers share the exact same geometry — same positions, same colors.
+// Adding the glow first means it renders behind the main stars.
+const glowCloud = new THREE.Points(geometry, glowMaterial);
+scene.add(glowCloud);
+
 // THREE.Points renders the geometry as a cloud of dots (particles).
 const particleCloud = new THREE.Points(geometry, material);
 scene.add(particleCloud);
