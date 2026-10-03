@@ -26,13 +26,20 @@ document.body.appendChild(renderer.domElement);
 
 const particleCount = 5000;
 
-// BufferGeometry stores vertex data (like positions) in a very efficient
-// memory format that the GPU can read directly. We store all 5,000
-// particle positions in a single array.
+// BufferGeometry stores vertex data (like positions and colors) in a very
+// efficient memory format that the GPU can read directly.
 const geometry = new THREE.BufferGeometry();
 
-// We need 3 numbers per particle: x, y, and z coordinates.
+// We need 3 numbers per particle for position (x, y, z) and 3 for color (r, g, b).
 const positions = new Float32Array(particleCount * 3);
+const colors = new Float32Array(particleCount * 3);
+
+// Predefined anchor colors for the distance-based gradient:
+//   center → magenta/pink → outer
+const centerColor = new THREE.Color(0.98, 0.85, 0.55);  // warm yellow-white
+const midColor = new THREE.Color(0.9, 0.4, 0.7);        // pink / magenta
+const outerColor = new THREE.Color(0.4, 0.4, 0.95);     // deep blue / violet
+const particleColor = new THREE.Color();                // reused per particle
 
 const arms = 2;
 
@@ -81,16 +88,52 @@ for (let i = 0; i < particleCount; i++) {
   positions[i * 3] = x;
   positions[i * 3 + 1] = y;
   positions[i * 3 + 2] = z;
+
+  // --- Color ---
+  // A color attribute assigns one RGB color per particle. Each particle
+  // stores its own color in the colors array so the shader knows exactly
+  // what color to draw for that specific particle.
+  //
+  // Distance from center controls the color:
+  //   - Very close to center: bright warm white/yellow with slight orange
+  //   - Middle region: warm pink/magenta → purple
+  //   - Outer region: purple → deep blue/violet
+  // We normalize the radius (0–5) to a 0–1 range and interpolate between
+  // three anchor colors using THREE.Color.lerpColors().
+  const t = THREE.MathUtils.clamp(radius / 5, 0, 1);
+
+  // Add subtle random variation so particles don't all look identical.
+  const variedT = THREE.MathUtils.clamp(
+    t + (Math.random() - 0.5) * 0.05,
+    0,
+    1
+  );
+
+  // Interpolate between the two relevant halves of the gradient.
+  if (variedT < 0.5) {
+    particleColor.lerpColors(centerColor, midColor, variedT / 0.5);
+  } else {
+    particleColor.lerpColors(midColor, outerColor, (variedT - 0.5) / 0.5);
+  }
+
+  colors[i * 3] = particleColor.r;
+  colors[i * 3 + 1] = particleColor.g;
+  colors[i * 3 + 2] = particleColor.b;
 }
 
 // Attach the positions array to the geometry.
 geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
+// Attach the colors array as a "color" attribute. The name "color" is
+// special in Three.js — it automatically maps to the material's vertex
+// colors when enabled.
+geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
 // PointsMaterial defines how each particle looks.
 // White, tiny particles look like distant stars.
 const material = new THREE.PointsMaterial({
   size: 0.02,
-  color: 0xffffff,
+  vertexColors: true, // tells Three.js to use the per-particle colors
 });
 
 // THREE.Points renders the geometry as a cloud of dots (particles).
