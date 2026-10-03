@@ -181,6 +181,60 @@ scene.add(glowCloud);
 const particleCloud = new THREE.Points(geometry, material);
 scene.add(particleCloud);
 
+// --- Background Stars ---
+// A separate Points layer for distant background stars. We use a *separate*
+// BufferGeometry so these stars don't share or interfere with the galaxy's
+// geometry — they have their own positions and colors.
+
+// A separate BufferGeometry is efficient because all 2,000 star positions
+// are stored in a single typed array uploaded to the GPU once, just like
+// the galaxy. No individual objects or draw calls per star.
+const bgGeometry = new THREE.BufferGeometry();
+const bgPositions = new Float32Array(2000 * 3);
+const bgColors = new Float32Array(2000 * 3);
+const bgColor = new THREE.Color();
+
+for (let i = 0; i < 2000; i++) {
+  // Spread stars across a large sphere (20–100 units away) so they
+  // feel far behind the galaxy and don't compete visually.
+  const dir = new THREE.Vector3(
+    (Math.random() - 0.5) * 2,
+    (Math.random() - 0.5) * 2,
+    (Math.random() - 0.5) * 2
+  ).normalize();
+  const distance = 20 + Math.random() * 80;
+  const position = dir.multiplyScalar(distance);
+  bgPositions[i * 3] = position.x;
+  bgPositions[i * 3 + 1] = position.y;
+  bgPositions[i * 3 + 2] = position.z;
+
+  // Mostly white with very subtle variation so no two stars are identical.
+  const brightness = 0.6 + Math.random() * 0.4;
+  bgColor.setRGB(brightness, brightness, brightness);
+  bgColors[i * 3] = bgColor.r;
+  bgColors[i * 3 + 1] = bgColor.g;
+  bgColors[i * 3 + 2] = bgColor.b;
+}
+
+bgGeometry.setAttribute("position", new THREE.BufferAttribute(bgPositions, 3));
+bgGeometry.setAttribute("color", new THREE.BufferAttribute(bgColors, 3));
+
+// Background stars are:
+//   - Smaller (0.005 vs galaxy's 0.02) so they look like distant pinpricks.
+//   - Fainter (opacity 0.4) so they don't overpower the galaxy.
+//   - Added to the scene directly (not under particleCloud), so they
+//     stay fixed while the galaxy rotates and the camera orbits.
+const bgMaterial = new THREE.PointsMaterial({
+  size: 0.005,
+  vertexColors: true,
+  transparent: true,
+  opacity: 0.4,
+  depthWrite: false, // render behind the galaxy without blocking it
+});
+
+const backgroundStars = new THREE.Points(bgGeometry, bgMaterial);
+scene.add(backgroundStars);
+
 // OrbitControls lets the user drag the mouse to rotate the view around the
 // galaxy center and use the mouse wheel to zoom in and out.
 const controls = new OrbitControls(camera, renderer.domElement);
