@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 // A Scene is the container that holds everything you want to display.
 // Think of it as the "stage" where your 3D objects, lights, and camera live.
@@ -13,13 +14,18 @@ const camera = new THREE.PerspectiveCamera(
   0.1, // near clipping plane
   1000 // far clipping plane
 );
-camera.position.z = 5;
+// Start the camera slightly above the galaxy so we can see the spiral
+// arms spread out below. Roughly a 30-degree angle from the horizontal.
+camera.position.set(0, 3, 5);
+camera.lookAt(0, 0, 0);
 
 // The Renderer draws everything from the scene through the camera onto the screen.
 // We set its size to fill the entire browser window.
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
+// Limit pixel ratio to 2 to avoid excessive rendering on high-DPI screens,
+// which can hurt performance without much visual gain.
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
 
 // --- Spiral Galaxy ---
@@ -175,13 +181,33 @@ scene.add(glowCloud);
 const particleCloud = new THREE.Points(geometry, material);
 scene.add(particleCloud);
 
+// OrbitControls lets the user drag the mouse to rotate the view around the
+// galaxy center and use the mouse wheel to zoom in and out.
+const controls = new OrbitControls(camera, renderer.domElement);
+
+// Damping makes camera movement feel smooth — it lags slightly behind
+// mouse input instead of stopping abruptly, like a gentle coast.
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+
+// A Clock tracks how much time has elapsed since it started, so animations
+// run at the same speed regardless of the computer's frame rate.
+const clock = new THREE.Clock();
+
 // The Animation Loop runs over and over (about 60 times per second) using
 // requestAnimationFrame. This is what makes the scene update and display.
 function animate() {
   requestAnimationFrame(animate);
 
-  // Rotate the galaxy slowly so the spiral structure is visible.
-  particleCloud.rotation.z += 0.001;
+  // One full rotation every ~60 seconds (2π / 60 radians per second).
+  // Using clock.getElapsedTime() keeps the speed consistent across computers.
+  const elapsed = clock.getElapsedTime();
+  const rotationSpeed = (Math.PI * 2) / 60;
+  particleCloud.rotation.z = elapsed * rotationSpeed;
+  glowCloud.rotation.z = elapsed * rotationSpeed;
+
+  // Apply damping to the camera controls every frame.
+  controls.update();
 
   renderer.render(scene, camera);
 }
